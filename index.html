@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Circle Moneyの全体構造と使い方。Discord、Google Apps Script、スプレッドシート、端末内レシート読み取りの関係を触って理解する公開ガイド。">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Circle Money — システム構造と使い方</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
+<header class="topbar">
+  <a class="brand" href="#"><span class="brand-mark">¥</span> Circle Money<span class="tag">SYSTEM GUIDE</span></a>
+  <nav aria-label="メインナビゲーション"><a href="#architecture">構成図</a><a href="#usage">使い方</a><a href="#privacy">データ保護</a><a href="#operations">運用</a></nav>
+  <a class="repo-link" href="https://github.com/degawa1013-gif/circle-money-guide" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+</header>
+<main id="main">
+<section class="intro">
+  <div><p class="eyebrow"><span class="live-dot"></span> CIRCLE MONEY / PUBLIC DOCUMENTATION</p><h1>お金の流れを、<br class="mobile-break">仕組みから見渡す。</h1><p class="intro-copy">Discordで入力し、Googleシートに記録する。<br>サークル会計の全体像と、毎日の使い方をひとつの地図に。</p></div>
+  <div class="intro-note"><span>このページについて</span><p>公開用の操作・構成ガイドです。<br>実際の会計データには接続しません。</p><small>実装確認：2026.10.06</small></div>
+</section>
+
+<section id="architecture" class="architecture" aria-labelledby="map-title">
+  <div class="section-head"><div><p class="eyebrow">01 / SYSTEM MAP</p><h2 id="map-title">つながりから理解する</h2></div><p>ノードを選ぶと、その役割と扱うデータを確認できます。</p></div>
+  <div class="map-shell">
+    <div class="map-toolbar"><div class="route-tabs" role="group" aria-label="表示する経路"><button data-route="all" aria-pressed="true">全体構成</button><button data-route="discord" aria-pressed="false">Discord入力</button><button data-route="web" aria-pressed="false">会計サイト</button><button data-route="receipt" aria-pressed="false">レシート</button></div><span class="map-caption">INTERACTIVE ARCHITECTURE</span></div>
+    <div class="map-layout">
+      <div class="graph-column">
+        <div class="graph-viewport" id="viewport" tabindex="0" role="region" aria-label="システム構成図。ノードはTabキーで選択可能。図の背景をドラッグして移動できます。">
+          <div class="graph-world" id="world">
+            <svg class="edges" viewBox="0 0 1180 620" aria-hidden="true">
+              <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker></defs>
+              <g id="edges"></g>
+            </svg>
+            <div class="zone-label zone-input">INPUT / 操作する場所</div><div class="zone-label zone-process">PROCESS / 検証と処理</div><div class="zone-label zone-store">STORAGE / 会計の記録</div>
+            <div id="nodes"></div>
+          </div>
+          <div class="graph-hint">背景をドラッグで移動 · ノードをクリックで詳細</div>
+          <div class="map-controls" aria-label="構成図の表示調整"><button id="zoom-out" aria-label="図を縮小">−</button><output id="zoom-level" aria-label="拡大率">100%</output><button id="zoom-in" aria-label="図を拡大">＋</button><button id="fit" aria-label="図の全体を表示">全体表示</button></div>
+          <svg class="minimap" viewBox="0 0 1180 620" aria-hidden="true"><g id="mini-nodes"></g><rect id="mini-view" width="1180" height="620"/></svg>
+        </div>
+        <div class="map-legend"><span><i class="legend-dot green"></i>会計項目</span><span><i class="legend-dot violet"></i>確認・返信</span><span><i class="legend-dot amber"></i>端末内の写真</span><span class="legend-foot">矢印＝情報の流れ ※Google側から定期取得</span></div>
+        <label class="mobile-node-picker">構成要素を選んで詳細を見る<select id="node-picker" aria-label="構成要素"><option value="discord">01 Discord</option><option value="receiver">02 Bot専用受付</option><option value="queue">03 暗号化した処理待ち</option><option value="web">04 Circle Money Web</option><option value="gas">05 Google Apps Script</option><option value="sheet">06 Google Sheets</option><option value="ocr">07 端末内レシートOCR</option></select></label>
+      </div>
+      <aside class="node-panel" aria-label="選択した構成要素の詳細"><div class="panel-label">NODE INSPECTOR <span id="node-number">01 / 07</span></div><div id="node-detail" aria-live="polite"></div></aside>
+    </div>
+    <div class="flow-player"><div class="flow-title"><span id="flow-label">FLOW WALKTHROUGH</span><strong id="flow-heading">Discord入力の流れ</strong></div><div class="flow-status" aria-live="polite"><span id="step-count">1 / 5</span><p id="step-text"></p></div><div class="flow-actions"><button id="step-back" aria-label="前のステップ">←</button><button id="play">流れを再生</button><button id="step-next" aria-label="次のステップ">→</button></div></div>
+  </div>
+  <div class="key-facts"><p><strong>Googleシート</strong><span>会計データの本体</span></p><p><strong>通常 1〜2分</strong><span>Discord操作から反映まで</span></p><p><strong>確認して登録</strong><span>入力だけでは保存しない</span></p><p><strong>写真は端末内</strong><span>保存するのは確認済みの項目</span></p></div>
+  <noscript><p class="notice">構成図の操作にはJavaScriptが必要です。Discord → 署名検証付き受付 → 暗号化した処理待ちデータ → Google Apps Scriptの毎分処理 → 非公開Googleシート、という流れです。会計サイトはGoogle Apps Script経由でシートを操作し、レシート写真は端末内で読み取ります。以下の使い方はそのまま読めます。</p></noscript>
+</section>
+
+<section id="usage" class="usage" aria-labelledby="usage-title">
+  <div class="section-head"><div><p class="eyebrow">02 / DAILY WORKFLOW</p><h2 id="usage-title">入力から確認まで、迷わずに。</h2></div><p>普段はDiscord。写真があるときは会計サイトへ。</p></div>
+  <div class="usage-grid">
+    <div class="instruction"><span class="mode-label">DISCORD</span><h3>支出を1件、登録する</h3><ol class="steps"><li><strong>指定チャンネルで「/会計」</strong><p>候補から「支出」を選びます。現在の実装では、設定された所有者本人のみ操作できます。</p></li><li><strong>金額・内容・カテゴリを入力</strong><p>金額は正の整数。日付は <code>YYYY-MM-DD</code> 形式で指定でき、省略すると日本時間の本日になります。</p></li><li><strong>内容を見て「確認して登録」</strong><p>確認期限は10分です。違っていたら「中止」して入力し直します。</p></li><li><strong>「登録しました」を確認</strong><p>通常1〜2分でシートに反映されます。返信は操作した本人だけに表示されます。</p></li></ol></div>
+    <div class="demo" aria-labelledby="demo-title"><div class="demo-head"><span class="demo-icon">#</span><div><h3 id="demo-title">会計入力を体験する</h3><span>架空の操作デモ · 実際には登録されません</span></div><span class="demo-badge">DEMO</span></div><form id="demo-form"><div class="demo-inputs"><label>金額（円）<input id="demo-amount" type="number" inputmode="numeric" min="1" max="100000000" step="1" value="7200" required></label><label>カテゴリ<select id="demo-category"><option>交通費</option><option>宿泊費</option><option>AIサブスク</option><option>名刺</option><option>ラジコン</option><option>PC購入</option><option>3Dプリンタ</option><option>印刷・消耗品費</option><option>その他</option></select></label><label class="wide">内容<input id="demo-item" maxlength="200" value="練習会への移動（架空の例）" required></label></div><button class="primary" type="submit">確認画面を試す <span>→</span></button></form><div id="demo-response" class="demo-response" aria-live="polite"><span class="demo-avatar">¥</span><div><strong>Circle Money <small>APP</small></strong><p id="demo-text">入力内容のプレビューを、ここで試せます。</p><div id="demo-buttons" hidden><button id="demo-confirm" class="primary">確認して登録（デモ）</button><button id="demo-cancel" class="secondary">中止</button></div><button id="demo-reset" class="secondary" hidden>もう一度試す</button><span class="ephemeral">◈ 本人だけに表示される返信の例</span></div></div></div>
+  </div>
+  <div class="command-section"><div><h3>使えるコマンド</h3><p>Discordで候補を選び、表示される入力欄を埋めます。</p></div><div class="table-wrap"><table><caption class="sr-only">会計Botのコマンド一覧</caption><thead><tr><th scope="col">コマンド</th><th scope="col">できること</th><th scope="col">補足</th></tr></thead><tbody>
+    <tr><td><button class="copy-command" data-copy="/会計 支出"><code>/会計 支出</code><span>コピー</span></button></td><td>支出を確認して登録</td><td>金額・内容・カテゴリが必須</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 収入"><code>/会計 収入</code><span>コピー</span></button></td><td>収入を確認して登録</td><td>金額・内容が必須</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 集計"><code>/会計 集計</code><span>コピー</span></button></td><td>今年度または指定月を集計</td><td>月は <code>YYYY-MM</code>、年度は4月始まり</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 一覧"><code>/会計 一覧</code><span>コピー</span></button></td><td>最近の取引を最大5件表示</td><td>シートの有効な取引を参照</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 残高"><code>/会計 残高</code><span>コピー</span></button></td><td>登録データから残高を計算</td><td>開始残高が未設定なら計算しない</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 取消"><code>/会計 取消</code><span>コピー</span></button></td><td>直近のBot登録を確認して取消</td><td>24時間以内・履歴は保持</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 サイト"><code>/会計 サイト</code><span>コピー</span></button></td><td>会計サイトの案内を表示</td><td>Googleログインと会計用パスワードが必要</td></tr>
+    <tr><td><button class="copy-command" data-copy="/会計 ヘルプ"><code>/会計 ヘルプ</code><span>コピー</span></button></td><td>操作方法を表示</td><td>困ったときの入口</td></tr>
+  </tbody></table></div><p id="copy-status" class="copy-status" role="status"></p></div>
+</section>
+
+<section class="receipt-section" aria-labelledby="receipt-title"><div class="receipt-visual" aria-hidden="true"><div class="receipt-paper"><span>サンプル領収書</span><p>青空文具店</p><div>ノート・筆記具 <b>¥1,100</b></div><hr><div>合計 <b>¥1,100</b></div><small>架空のサンプル</small><div class="scan-line"></div></div><div class="local-badge"><span class="live-dot"></span> 読み取りは端末内</div></div><div><p class="eyebrow">PHOTO → REVIEW → RECORD</p><h2 id="receipt-title">写真は保存せず、<br>必要な項目だけを記録。</h2><ol class="receipt-steps"><li>会計サイトにログインし「レシートを読む」を開く</li><li>写真を選ぶ、または対応端末のカメラで撮影する</li><li>読み取った日付・店名・内容・カテゴリ・金額を確認・修正する</li><li>確認チェックを入れ、1枚を1取引として登録する</li></ol><p class="subtle">JPEG / PNG / WebP、12 MBまで。HEIC・PDFは変換が必要です。OCRは誤読することがあるため、必ず原本と照合してください。</p><p class="notice">写真をDiscordに送る方式ではありません。会計サイトで画像と読み取り全文をメモリー内に保持し、フォームを閉じると破棄します。端末にある元の写真は削除しません。</p></div></section>
+
+<section id="privacy" aria-labelledby="privacy-title"><div class="section-head"><div><p class="eyebrow">03 / PRIVACY BY BOUNDARY</p><h2 id="privacy-title">何が、どこに保存されるか。</h2></div><p>公開している説明と、非公開の会計データを分けています。</p></div><div class="privacy-grid"><article><span class="privacy-symbol">01</span><h3>会計データの本体</h3><p>Googleスプレッドシートに保存します。現在の会計サイトとシートは所有者本人限定。会計サイトには追加のパスワードがあります。</p><span class="pill">非公開 / Google</span></article><article><span class="privacy-symbol">02</span><h3>Discordの入力と返信</h3><p>入力項目と結果はDiscordサービスを経由します。返信は本人だけに表示。通常の雑談履歴や添付写真はBotが収集しません。</p><span class="pill violet-pill">本人限定の返信</span></article><article><span class="privacy-symbol">03</span><h3>処理待ちの一時データ</h3><p>専用受付で入力項目・返信用情報・結果をAES-GCMで暗号化。Google連携の稼働中、24時間を過ぎた受付記録を削除します。</p><span class="pill amber-pill">停止中は削除処理も停止</span></article></div><div class="privacy-bottom"><div><h3>入口を公開しても、会計は公開しない</h3><p>Bot受付はDiscordから到達できる入口です。署名・アプリ・担当者・サーバー・チャンネルを検証し、Googleとの連携には別の署名検証を使います。Google側の外部POST APIは無効です。</p></div><div><h3>公開ガイドには実データを含めない</h3><p>このページは静的HTMLです。本番シート、個人の接続URL、Discordの識別子、パスワードやトークンを含めず、会計サービスへの通信もしません。</p></div></div><p class="footnote">実際のOCRではエンジン・日本語データをjsDelivrから取得します。写真や読み取り全文は送信しませんが、IPアドレス等の通常の通信情報は接続先に伝わります。このガイド自体には外部スクリプト・解析タグを使用していません。配信元GitHubは通常のアクセス情報を処理します。</p></section>
+
+<section id="operations" aria-labelledby="operations-title"><div class="section-head"><div><p class="eyebrow">04 / OPERATIONS</p><h2 id="operations-title">困ったときと、管理のポイント。</h2></div></div><div class="operations-grid"><div class="faq">
+  <details><summary>コマンドが出ない・操作できない</summary><p>Botが入っている指定サーバー・指定チャンネルかを確認します。現在の実装はアプリ所有者本人のみ利用できます。サーバー内の全員に会計権限があるわけではありません。</p></details>
+  <details><summary>「受け付けました」のまま進まない</summary><p>通常1〜2分待ち、「状況を確認」を押します。すぐに同じ内容を入力し直さず、「一覧」や会計サイトで登録状況を確認してください。管理者はApps Scriptのトリガーと実行履歴を確認します。</p></details>
+  <details><summary>「Googleシートとの接続が止まっています」</summary><p>Googleからの定期連絡が5分以上途絶えると、新しい会計操作を停止します。管理者が連携を確認してください。会計サイトは引き続き利用できます。</p></details>
+  <details><summary>残高が出ない・通帳と金額が違う</summary><p>開始残高を設定し、収入・支出・支払状況を確認します。読み込んだ購入記録をすべて支払済みとはみなしません。登録データからの集計は、実際の口座残高を自動取得したものではありません。</p></details>
+  <details><summary>Botがオフライン表示でも使える？</summary><p>このBotはDiscordのHTTP操作リクエストを受ける方式です。常時接続のオンライン表示に依存しません。「/会計 ヘルプ」の応答で確認してください。</p></details>
+  <details><summary>レシートを正しく読めない</summary><p>文字がはっきり写るように撮影し、必要なら90度回転します。読み取れない項目は手で補正してください。品目ごとの自動仕訳や、写真の保管には対応していません。</p></details>
+  </div><aside class="admin-notes"><span class="mode-label">FOR MAINTAINERS</span><h3>管理者用メモ</h3><dl><dt>連携の開始・再開</dt><dd><code>setupDiscordBridge</code><p>Apps Scriptで実行。毎分の処理を設定します。</p></dd><dt>連携の停止</dt><dd><code>stopDiscordBot</code><p>Botだけを停止。会計サイトは継続します。</p></dd><dt>データの整合性</dt><dd>同じ登録IDの再送は重複させず、取消は履歴を残します。シートの列名・列順は変更しないでください。</dd><dt>秘密情報の管理</dt><dd>BotトークンはGoogleのスクリプトプロパティに保管。受付には連携用の導出鍵を暗号化して保管します。設定変更時は両側を合わせて更新します。</dd></dl></aside></div>
+  <div class="implementation"><span class="live-dot"></span><div><strong>確認済みの範囲</strong><p>Discordのヘルプ・集計・テスト登録・取消・取消後の合計復元を実環境で確認済み。レシートは日本語の架空サンプルで端末内OCRと確認操作を検証済みです。実機スマートフォンでの撮影は未検証です。</p></div><span class="version">AS OF 2026.10.06</span></div>
+</section>
+</main>
+<footer><a class="brand" href="#"><span class="brand-mark">¥</span> Circle Money</a><p>仕組みを知って、安心して記録する。<br><small>公開用ガイド · 実データを含まない静的ページ</small></p><a href="https://github.com/degawa1013-gif/circle-money-guide" target="_blank" rel="noopener noreferrer">このガイドのソース ↗</a></footer>
+</body>
+</html>
