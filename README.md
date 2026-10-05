@@ -2,6 +2,8 @@
 
 Circle Moneyの構成と操作を説明する、日本語の公開HTMLガイドです。
 
+**[ガイドを開く](https://degawa1013-gif.github.io/circle-money-guide/)**
+
 ## 掲載内容
 
 - 選択・拡大・ドラッグできる構成図とノードの詳細
@@ -23,6 +25,7 @@ GitHub Pagesは公開ブランチのルートを配信します。
 ## 構成の要点
 
 Discord操作 → 署名・担当者・指定先を検証する受付 → 暗号化した処理待ちデータ → Google Apps Scriptによる毎分の取得 → 非公開Googleシート。
+受付はSites上のCloudflare Workers、処理待ちはD1を使用します。Discord側はEd25519署名、Google側との連携はHMAC署名を検証します。
 結果は受付からDiscordの本人限定返信へ反映します。
 会計サイトはGoogleログインと会計用パスワードで認証し、Google側の処理を通じてシートを操作します。
 写真は会計サイトの端末内で読み取り、確認済みの項目のみ登録します。
