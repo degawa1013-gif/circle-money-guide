@@ -5,7 +5,7 @@ const nodes = [
  {id:'discord', title:'Discord',code:'01',x:44,y:94,kind:'USER INTERFACE',body:'/会計 → 入力 → 確認\n返信は本人だけに表示',description:'普段の会計入力の入口。支出・収入を入力し、確認ボタンを押すと登録を受け付けます。集計や取消も同じ場所で行えます。',data:'金額・日付・内容・カテゴリ、操作した人と指定先の情報。',storage:'入力と返信はDiscordサービスを経由します。返信は本人だけに表示します。',note:'現在はアプリ所有者本人と、設定されたサーバー・チャンネルだけで利用できます。'},
  {id:'receiver',title:'Bot専用受付',code:'02',x:360,y:94,kind:'VERIFIED ENTRY POINT',body:'署名・担当者・指定先を検証\n返信用の情報を受け取る',description:'Sites上のCloudflare WorkersでDiscordの操作を受け取ります。Ed25519署名と利用範囲を確認し、許可された操作だけを受け付けます。',data:'Discordの署名付き操作、確認ボタンの選択、処理結果。',storage:'本番トークンは設定時だけ使用。連携用の導出鍵は暗号化して保存します。',note:'通常の雑談履歴や写真を読むBotではありません。返信は本人限定です。'},
  {id:'queue',title:'暗号化した処理待ち',code:'03',x:667,y:94,kind:'ENCRYPTED QUEUE / D1',body:'確認済みの操作を一時保存\n同じ登録IDで重複を防止',description:'Googleが次に処理する操作を待機させます。入力や返信用情報、結果を暗号化し、同じ登録IDの再試行を追跡します。',data:'処理に必要な項目、登録ID、状態、短時間有効な返信用情報。',storage:'AES-GCMで暗号化。連携稼働中、作成から24時間を過ぎた受付記録を削除します。',note:'この場所は会計台帳ではありません。Google連携が停止している間は削除処理も停止します。'},
- {id:'web',title:'Circle Money Web',code:'04',x:44,y:304,kind:'PRIVATE WEB APP',body:'Googleログイン＋パスワード\n集計・取引一覧・手入力',description:'Google Apps Scriptで配信する会計画面です。グラフや取引一覧を確認し、取引の手入力・取消・レシート読み取りを行います。',data:'認証された操作と会計項目。写真からの候補は登録前に確認します。',storage:'会計データはシートへ保存。画像とOCR全文はブラウザーのメモリー内だけで扱います。',note:'サイトの入口はDiscordの「/会計 サイト」で確認できます。この公開ガイドには個人用URLを掲載しません。'},
+ {id:'web',title:'Circle Money Web',code:'04',x:44,y:304,kind:'MEMBER WEB APP',body:'メンバー共有のパスワード\n集計・取引一覧・手入力',description:'Google Apps Scriptで配信する会計画面です。共通パスワードを知るメンバーが利用できます。グラフや取引一覧を確認し、取引の手入力・取消・レシート読み取りを行います。',data:'認証された操作と会計項目。写真からの候補は登録前に確認します。',storage:'会計データはシートへ保存。画像とOCR全文はブラウザーのメモリー内だけで扱います。',note:'サイトの入口はDiscordの「/会計 サイト」で確認できます。この公開ガイドには個人用URLを掲載しません。'},
  {id:'gas',title:'Google Apps Script',code:'05',x:667,y:304,kind:'PRIVATE PROCESSING',body:'毎分取得 / 検証 / 排他制御\n登録・集計・取消を実行',description:'シートを操作する中心の処理です。Google側から毎分、HMAC署名付き通信で受付を確認します。確認済みの操作を検証して実行し、結果を受付へ返します。',data:'必要な操作と確認済み項目。全台帳をDiscordの受付へ送る構成ではありません。',storage:'Botトークンはスクリプトプロパティに保存します。外部POST APIは無効です。',note:'図の矢印は情報の流れです。処理待ちの取得通信はGoogle側から開始します。'},
  {id:'sheet',title:'Google Sheets',code:'06',x:945,y:304,kind:'SOURCE OF TRUTH',body:'Transactions / Settings\n会計記録と開始残高',description:'会計データの本体です。日付、区分を表す金額、カテゴリ、内容、登録元などを保持し、サイトとBotが同じ記録を参照します。',data:'取引ID・日付・カテゴリ・内容・金額・店名・登録元・取消日時など。',storage:'非公開のGoogleスプレッドシート。取消後も履歴を保持し、有効な取引だけを集計します。',note:'開始残高・収入・支払状況を確認してください。登録済み支出の合計だけでは現金残高は確定しません。'},
  {id:'ocr',title:'端末内レシートOCR',code:'07',x:360,y:484,kind:'ON-DEVICE / TESSERACT.JS',body:'写真 → 読み取り候補 → 確認\n写真・全文はアップロードしない',description:'会計サイト内で写真を読み取り、日付・店名・金額などの候補を作ります。元の写真と照合し、修正・確認してから登録します。',data:'JPEG・PNG・WebPの写真と、読み取り候補。1枚を1取引として扱います。',storage:'写真とOCR全文はブラウザーのメモリー内。フォームを閉じると破棄し、確認済み項目だけをシートに送ります。',note:'OCR用プログラム・日本語データは外部CDNから取得しますが、写真は送信しません。'},
@@ -32,7 +32,7 @@ const routes = {
   {nodes:['gas','receiver','discord'],edges:['result','reply'],text:'通常1〜2分で、登録結果を本人だけに返信します。'},
  ]},
  web:{title:'会計サイトの流れ',nodes:['web','gas','sheet'],edges:['web-save','save','read','web-result'],steps:[
-  {nodes:['web'],edges:[],text:'Googleログインと会計用パスワードでサイトを開きます。'},
+  {nodes:['web'],edges:[],text:'共有された会計用パスワードでサイトを開きます。'},
   {nodes:['web'],edges:[],text:'「＋ 取引を登録」で日付・区分・カテゴリ・内容・金額を入力します。'},
   {nodes:['web','gas','sheet'],edges:['web-save','save'],text:'Google側で認証と入力を検証し、非公開シートに記録します。'},
   {nodes:['sheet','gas','web'],edges:['read','web-result'],text:'更新した会計データでグラフと取引一覧を表示します。'},
